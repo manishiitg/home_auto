@@ -1,0 +1,59 @@
+import http from 'http';
+import express from 'express';
+import cors from 'cors';
+import bodyParser from 'body-parser';
+import initializeDb from './db';
+import middleware from './middleware';
+import api from './api';
+import config from './config.json';
+
+
+let app = express();
+let io;
+app.server = http.createServer(app);
+io = require("socket.io")(app.server);
+
+
+let client_socket_io = require("socket.io-client")(config.main_server);
+
+app.use(cors({
+	exposedHeaders: config.corsHeaders
+}));
+
+app.use(bodyParser.json({
+	limit : config.bodyLimit
+}));
+
+io.on("connection", ( socket ) => {
+	console.log("UUHUU!! Raspberry pi got connected!");
+	socket.on("hello", ( msg ) => {
+		console.log("==>> message from server ==>> "+ msg);
+		client_socket_io.emit("hello","@server Let's! change the world");
+	});
+	socket.on("ebulb", (msg) => {
+		console.log("==>> message from server ==>> Electric bulb set to: " + msg );
+		client_socket_io.emit("ebulb", "Electric bulb set to: " + msg);
+	});
+});
+
+// connect to db
+initializeDb( db => {
+
+	// internal middleware
+	app.use(middleware({ config, db }));
+
+	// api router
+	app.use('/api', api({ config, db }));
+
+	app.server.listen(process.env.PORT || config.port);
+
+	console.log(`Started on port ${app.server.address().port}`);
+	console.log(config, db);
+});
+
+
+function setGPIO(){
+	rpio.open(12, rpio.OUTPUT, rpio.LOW);
+}
+
+export default app;
